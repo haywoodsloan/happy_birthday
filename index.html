@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="X-UA-Compatible" content="ie=edge" />
+
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
+    <link rel="manifest" href="/site.webmanifest" />
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,100..900;1,100..900&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        height: 100%;
+        overflow: hidden;
+        background-color: black;
+      }
+
+      canvas,
+      main {
+        height: 100%;
+        width: 100%;
+      }
+    </style>
+
+    <title>Happy Birthday!</title>
+  </head>
+  <body>
+    <main>
+      <canvas height="0" width="0"></canvas>
+    </main>
+
+    <script type="module">
+      import Color from 'https://cdn.jsdelivr.net/npm/color@5.0.0/+esm';
+
+      const urlParams = new URLSearchParams(window.location.search);
+      const nameTxt = urlParams.get('name')?.toUpperCase() ?? 'YOU';
+
+      const [main] = document.getElementsByTagName('canvas');
+      const background = document.createElement('canvas');
+
+      const mainCtx = main.getContext('2d');
+      const bgCtx = background.getContext('2d');
+
+      await document.fonts.load('1px Roboto');
+      mainCtx.font = '1px Roboto';
+
+      const { width: bWidth } = mainCtx.measureText('BIRTHDAY');
+      const { width: nWidth } = mainCtx.measureText(`${nameTxt}!`);
+      const maxWidth = Math.max(bWidth, nWidth);
+
+      let fgColor;
+      let bgColor;
+      randomizeColors();
+      let pixelCnt = 0;
+
+      let patternIdx = 0;
+      const patterns = [simple, scanner, dissolve];
+
+      main.addEventListener('click', () => {
+        patternIdx = (patternIdx + 1) % patterns.length;
+        randomizeColors();
+        patterns[patternIdx](true);
+      });
+
+      // Main render loop
+      requestAnimationFrame(function loop() {
+        try {
+          render();
+        } finally {
+          requestAnimationFrame(loop);
+        }
+      });
+
+      function render() {
+        const resized = resize();
+        patterns[patternIdx](resized);
+      }
+
+      // Dissolve Pattern
+      const dissolveDurationMs = 2500;
+      const dissolveEndHoldMs = 250;
+
+      let lastDissolveLoop = Date.now();
+      let curDissolvePixel = 0;
+      let randomIdxs = [];
+
+      function dissolve(reset) {
+        if (reset) {
+          lastDissolveLoop = Date.now();
+
+          curDissolvePixel = 0;
+          randomIdxs = shuffle([...Array(pixelCnt).keys()]);
+
+          resetForTransform();
+          return;
+        }
+
+        const now = Date.now();
+        if (now - lastDissolveLoop > dissolveDurationMs + dissolveEndHoldMs) {
+          lastDissolveLoop = Date.now();
+
+          curDissolvePixel = 0;
+          randomIdxs = shuffle([...Array(pixelCnt).keys()]);
+
+          randomizeColors();
+          resetForTransform();
+
+          return;
+        }
+
+        const ratio = (now - lastDissolveLoop) / dissolveDurationMs;
+        const newPixel = Math.min(Math.round(ratio * pixelCnt), pixelCnt);
+
+        for (; curDissolvePixel < newPixel; curDissolvePixel++) {
+          const randomIdx = randomIdxs[curDissolvePixel];
+          const y = Math.floor(randomIdx / main.width);
+          const x = randomIdx % main.width;
+          mainCtx.drawImage(background, x, y, 1, 1, x, y, 1, 1);
+        }
+      }
+
+      // Scanner Pattern
+      const scanDurationMs = 2500;
+      const scanEndHoldMs = 250;
+
+      let horizontal = true;
+      let lastScanLoop = Date.now();
+      let curScanPixel = 0;
+
+      function scanner(reset) {
+        if (reset) {
+          lastScanLoop = Date.now();
+          curScanPixel = 0;
+
+          resetForTransform();
+          return;
+        }
+
+        const now = Date.now();
+        if (now - lastScanLoop > scanDurationMs + scanEndHoldMs) {
+          horizontal = !horizontal;
+          lastScanLoop = Date.now();
+          curScanPixel = 0;
+
+          randomizeColors();
+          resetForTransform();
+
+          return;
+        }
+
+        const ratio = (now - lastScanLoop) / scanDurationMs;
+        const newPixel = Math.min(Math.round(ratio * pixelCnt), pixelCnt);
+
+        for (; curScanPixel < newPixel; curScanPixel++) {
+          const y = horizontal
+            ? Math.floor(curScanPixel / main.width)
+            : curScanPixel % main.height;
+
+          const x = horizontal
+            ? curScanPixel % main.width
+            : Math.floor(curScanPixel / main.height);
+
+          mainCtx.drawImage(background, x, y, 1, 1, x, y, 1, 1);
+        }
+      }
+
+      // Simple pattern
+
+      let lastSimpleLoop = Date.now();
+      function simple(reset) {
+        const colorChangeMs = 1000;
+        if (Date.now() - lastSimpleLoop > colorChangeMs) {
+          lastSimpleLoop = Date.now();
+          randomizeColors();
+          drawMessage(mainCtx);
+        } else if (reset) {
+          drawMessage(mainCtx);
+        }
+      }
+
+      /**
+       * @param {CanvasRenderingContext2D} ctx
+       */
+      function drawMessage(ctx) {
+        ctx.fillStyle = bgColor;
+        ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+
+        const midX = ctx.canvas.width / 2;
+        const midY = ctx.canvas.height / 2;
+
+        const fontSize = Math.min(
+          Math.round(ctx.canvas.width / maxWidth),
+          Math.round(ctx.canvas.height / 2.7)
+        );
+
+        ctx.fillStyle = fgColor;
+        ctx.textAlign = 'center';
+        ctx.font = `${fontSize}px Roboto`;
+        ctx.textBaseline = 'middle';
+
+        ctx.fillText('HAPPY', midX, midY - fontSize / 1.15);
+        ctx.fillText('BIRTHDAY', midX, midY);
+        ctx.fillText(`${nameTxt}!`, midX, midY + fontSize / 1.15);
+      }
+
+      /**
+       * @param {CanvasRenderingContext2D} ctx
+       */
+      function resetForTransform(ctx) {
+        mainCtx.clearRect(0, 0, main.width, main.height);
+        drawMessage(bgCtx);
+      }
+
+      function resize() {
+        let resized = false;
+        if (main.height !== main.clientHeight) {
+          resized = true;
+          main.height = main.clientHeight;
+        }
+
+        if (main.width !== main.clientWidth) {
+          resized = true;
+          main.width = main.clientWidth;
+        }
+
+        if (background.height !== main.clientHeight) {
+          resized = true;
+          background.height = main.clientHeight;
+        }
+
+        if (background.width !== main.clientWidth) {
+          resized = true;
+          background.width = main.clientWidth;
+        }
+
+        if (resized) {
+          pixelCnt = main.width * main.height;
+        }
+
+        return resized;
+      }
+
+      function randomizeColors() {
+        fgColor = Color(getRandomColor()).saturate(100).lightness(50);
+        bgColor = fgColor.rotate(180);
+      }
+
+      function getRandomColor() {
+        const letters = '0123456789ABCDEF';
+        let color = '#';
+
+        for (var i = 0; i < 6; i++) {
+          color += letters[Math.floor(Math.random() * 16)];
+        }
+
+        return color;
+      }
+
+      function shuffle(array) {
+        let currentIndex = array.length;
+
+        // While there remain elements to shuffle...
+        while (currentIndex != 0) {
+          // Pick a remaining element...
+          let randomIndex = Math.floor(Math.random() * currentIndex);
+          currentIndex--;
+
+          // And swap it with the current element.
+          [array[currentIndex], array[randomIndex]] = [
+            array[randomIndex],
+            array[currentIndex],
+          ];
+        }
+
+        return array;
+      }
+    </script>
+  </body>
+</html>
