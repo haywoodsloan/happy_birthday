@@ -49,8 +49,13 @@
       const [main] = document.getElementsByTagName('canvas');
       const background = document.createElement('canvas');
 
-      const mainCtx = main.getContext('2d');
-      const bgCtx = background.getContext('2d');
+      const mainCtx = main.getContext('2d', {
+        alpha: false,
+      });
+
+      const bgCtx = background.getContext('2d', {
+        alpha: false,
+      });
 
       await document.fonts.load('1px Roboto');
       mainCtx.font = '1px Roboto';
@@ -75,11 +80,8 @@
 
       // Main render loop
       requestAnimationFrame(function loop() {
-        try {
-          render();
-        } finally {
-          requestAnimationFrame(loop);
-        }
+        render();
+        requestAnimationFrame(loop);
       });
 
       function render() {
