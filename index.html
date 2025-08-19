@@ -23,13 +23,13 @@
         padding: 0;
         height: 100%;
         overflow: hidden;
-        background-color: black;
       }
 
       canvas,
       main {
         height: 100%;
         width: 100%;
+        position: absolute;
       }
     </style>
 
@@ -37,6 +37,7 @@
   </head>
   <body>
     <main>
+      <canvas height="0" width="0"></canvas>
       <canvas height="0" width="0"></canvas>
     </main>
 
@@ -46,16 +47,9 @@
       const urlParams = new URLSearchParams(window.location.search);
       const nameTxt = urlParams.get('name')?.toUpperCase() ?? 'YOU';
 
-      const [main] = document.getElementsByTagName('canvas');
-      const background = document.createElement('canvas');
-
-      const mainCtx = main.getContext('2d', {
-        alpha: false,
-      });
-
-      const bgCtx = background.getContext('2d', {
-        alpha: false,
-      });
+      const [main, cover] = document.getElementsByTagName('canvas');
+      const mainCtx = main.getContext('2d', { alpha: false });
+      const coverCtx = cover.getContext('2d');
 
       await document.fonts.load('1px Roboto');
       mainCtx.font = '1px Roboto';
@@ -72,7 +66,7 @@
       let patternIdx = 0;
       const patterns = [simple, scanner, dissolve];
 
-      main.addEventListener('click', () => {
+      cover.addEventListener('click', () => {
         patternIdx = (patternIdx + 1) % patterns.length;
         randomizeColors();
         patterns[patternIdx](true);
@@ -128,7 +122,7 @@
           const randomIdx = randomIdxs[curDissolvePixel];
           const y = Math.floor(randomIdx / main.width);
           const x = randomIdx % main.width;
-          mainCtx.drawImage(background, x, y, 1, 1, x, y, 1, 1);
+          coverCtx.clearRect(x, y, 1, 1);
         }
       }
 
@@ -173,7 +167,7 @@
             ? curScanPixel % main.width
             : Math.floor(curScanPixel / main.height);
 
-          mainCtx.drawImage(background, x, y, 1, 1, x, y, 1, 1);
+          coverCtx.clearRect(x, y, 1, 1);
         }
       }
 
@@ -182,11 +176,16 @@
       let lastSimpleLoop = Date.now();
       function simple(reset) {
         const colorChangeMs = 1000;
+        if (reset) {
+          lastSimpleLoop = Date.now();
+          coverCtx.clearRect(0, 0, cover.width, cover.height);
+          drawMessage(mainCtx);
+          return;
+        }
+
         if (Date.now() - lastSimpleLoop > colorChangeMs) {
           lastSimpleLoop = Date.now();
           randomizeColors();
-          drawMessage(mainCtx);
-        } else if (reset) {
           drawMessage(mainCtx);
         }
       }
@@ -216,12 +215,10 @@
         ctx.fillText(`${nameTxt}!`, midX, midY + fontSize / 1.15);
       }
 
-      /**
-       * @param {CanvasRenderingContext2D} ctx
-       */
-      function resetForTransform(ctx) {
-        mainCtx.clearRect(0, 0, main.width, main.height);
-        drawMessage(bgCtx);
+      function resetForTransform() {
+        coverCtx.fillStyle = 'black';
+        coverCtx.fillRect(0, 0, cover.width, cover.height);
+        drawMessage(mainCtx);
       }
 
       function resize() {
@@ -236,14 +233,14 @@
           main.width = main.clientWidth;
         }
 
-        if (background.height !== main.clientHeight) {
+        if (cover.height !== main.clientHeight) {
           resized = true;
-          background.height = main.clientHeight;
+          cover.height = main.clientHeight;
         }
 
-        if (background.width !== main.clientWidth) {
+        if (cover.width !== main.clientWidth) {
           resized = true;
-          background.width = main.clientWidth;
+          cover.width = main.clientWidth;
         }
 
         if (resized) {
