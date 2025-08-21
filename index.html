@@ -166,9 +166,9 @@
                   spiralBlockSize,
                   spiralBlockSize
                 );
-                curSpiralCords[0] += spiralBlockSize;
 
                 // Catch any extras to the right
+                curSpiralCords[0] += spiralBlockSize;
                 if (cover.width - curSpiralCords[0] < spiralBlockSize) {
                   coverCtx.clearRect(
                     curSpiralCords[0],
@@ -204,9 +204,8 @@
                   );
                 }
 
-                curSpiralCords[1] += spiralBlockSize;
-
                 // Catch any extras to the bottom-right
+                curSpiralCords[1] += spiralBlockSize;
                 if (cover.height - curSpiralCords[1] < spiralBlockSize) {
                   coverCtx.clearRect(
                     curSpiralCords[0],
@@ -258,11 +257,12 @@
                   spiralBlockSize,
                   spiralBlockSize
                 );
+                
                 curSpiralCords[1] -= spiralBlockSize;
                 break;
               } else {
-                spiralDirection = 'right';
                 curSpiralBlock--;
+                spiralDirection = 'right';
                 spiralXBounds[0] += spiralBlockSize;
                 curSpiralCords[0] += spiralBlockSize;
                 curSpiralCords[1] += spiralBlockSize;
