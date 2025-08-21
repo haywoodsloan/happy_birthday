@@ -46,7 +46,7 @@
       const easing = BezierEasing(0.25, 0.1, 0.25, 1.0);
 
       const urlParams = new URLSearchParams(window.location.search);
-      const nameTxt = urlParams.get('name')?.toUpperCase() ?? 'YOU';
+      const nameTxt = urlParams.get('name')?.toUpperCase() ?? 'FRIEND';
 
       const [main, cover] = document.getElementsByTagName('canvas');
       const coverCtx = cover.getContext('2d', { willReadFrequently: true });
