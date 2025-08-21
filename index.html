@@ -50,7 +50,10 @@
 
       const [main, cover] = document.getElementsByTagName('canvas');
       const coverCtx = cover.getContext('2d', { willReadFrequently: true });
-      const mainCtx = main.getContext('2d', { alpha: false });
+      const mainCtx = main.getContext('2d', {
+        willReadFrequently: true,
+        alpha: false,
+      });
 
       await document.fonts.load('1px Roboto');
       mainCtx.font = '1px Roboto';
