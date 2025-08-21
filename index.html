@@ -21,14 +21,12 @@
       body {
         margin: 0;
         padding: 0;
+
         height: 100%;
         overflow: hidden;
       }
 
-      canvas,
-      main {
-        height: 100%;
-        width: 100%;
+      canvas {
         position: absolute;
       }
     </style>
@@ -43,13 +41,16 @@
 
     <script type="module">
       import Color from 'https://cdn.jsdelivr.net/npm/color@5.0.0/+esm';
+      import BezierEasing from 'https://cdn.jsdelivr.net/npm/bezier-easing@2.1.0/+esm';
+
+      const easing = BezierEasing(0.25, 0.1, 0.25, 1.0);
 
       const urlParams = new URLSearchParams(window.location.search);
       const nameTxt = urlParams.get('name')?.toUpperCase() ?? 'YOU';
 
       const [main, cover] = document.getElementsByTagName('canvas');
+      const coverCtx = cover.getContext('2d', { willReadFrequently: true });
       const mainCtx = main.getContext('2d', { alpha: false });
-      const coverCtx = cover.getContext('2d');
 
       await document.fonts.load('1px Roboto');
       mainCtx.font = '1px Roboto';
@@ -64,7 +65,7 @@
       let pixelCnt = 0;
 
       let patternIdx = 0;
-      const patterns = [simple, scanner, dissolve];
+      const patterns = [simple, scanner, dissolve, lines];
 
       cover.addEventListener('click', () => {
         patternIdx = (patternIdx + 1) % patterns.length;
@@ -83,9 +84,70 @@
         patterns[patternIdx](resized);
       }
 
+      // Lines Pattern
+      const linesDurationMs = 3000;
+      const linesStartHoldMs = 350;
+      const linesEndHoldMs = 350;
+
+      let lastLinesLoop = Date.now();
+      let curLinesRow = 0;
+      let curLinesCol = 0;
+      let randomRows = [];
+      let randomCols = [];
+
+      function lines(reset) {
+        if (reset) {
+          curLinesRow = 0;
+          curLinesCol = 0;
+
+          randomRows = shuffle([...Array(cover.height).keys()]);
+          randomCols = shuffle([...Array(cover.width).keys()]);
+
+          resetForTransform();
+          lastLinesLoop = Date.now();
+
+          return;
+        }
+
+        const now = Date.now();
+        if (
+          now - lastLinesLoop >
+          linesDurationMs + linesEndHoldMs + linesStartHoldMs
+        ) {
+          curLinesRow = 0;
+          curLinesCol = 0;
+
+          randomRows = shuffle([...Array(cover.height).keys()]);
+          randomCols = shuffle([...Array(cover.width).keys()]);
+
+          randomizeColors();
+          resetForTransform();
+
+          lastLinesLoop = Date.now();
+          return;
+        }
+
+        const ratio = easing(
+          Math.max(now - lastLinesLoop - linesStartHoldMs, 0) / linesDurationMs
+        );
+
+        const newRow = Math.min(Math.round(ratio * cover.height), cover.height);
+        for (; curLinesRow < newRow; curLinesRow++) {
+          const randomRow = randomRows[curLinesRow];
+          coverCtx.clearRect(0, randomRow, cover.width, 1);
+        }
+
+        const newCol = Math.min(Math.round(ratio * cover.width), cover.width);
+        for (; curLinesCol < newCol; curLinesCol++) {
+          const randomCol = randomCols[curLinesCol];
+          coverCtx.clearRect(randomCol, 0, 1, cover.height);
+        }
+      }
+
       // Dissolve Pattern
-      const dissolveDurationMs = 2500;
-      const dissolveEndHoldMs = 250;
+      const dissolveDurationMs = 3000;
+      const dissolveStartHoldMs = 350;
+      const dissolveEndHoldMs = 350;
 
       let lastDissolveLoop = Date.now();
       let curDissolvePixel = 0;
@@ -93,42 +155,47 @@
 
       function dissolve(reset) {
         if (reset) {
-          lastDissolveLoop = Date.now();
-
           curDissolvePixel = 0;
           randomIdxs = shuffle([...Array(pixelCnt).keys()]);
 
           resetForTransform();
+          lastDissolveLoop = Date.now();
+
           return;
         }
 
         const now = Date.now();
-        if (now - lastDissolveLoop > dissolveDurationMs + dissolveEndHoldMs) {
-          lastDissolveLoop = Date.now();
-
+        if (
+          now - lastDissolveLoop >
+          dissolveDurationMs + dissolveEndHoldMs + dissolveStartHoldMs
+        ) {
           curDissolvePixel = 0;
           randomIdxs = shuffle([...Array(pixelCnt).keys()]);
 
           randomizeColors();
           resetForTransform();
 
+          lastDissolveLoop = Date.now();
           return;
         }
 
-        const ratio = (now - lastDissolveLoop) / dissolveDurationMs;
-        const newPixel = Math.min(Math.round(ratio * pixelCnt), pixelCnt);
+        const ratio = easing(
+          Math.max(now - lastDissolveLoop - dissolveStartHoldMs, 0) /
+            dissolveDurationMs
+        );
 
+        const newPixel = Math.min(Math.round(ratio * pixelCnt), pixelCnt);
         for (; curDissolvePixel < newPixel; curDissolvePixel++) {
           const randomIdx = randomIdxs[curDissolvePixel];
-          const y = Math.floor(randomIdx / main.width);
-          const x = randomIdx % main.width;
+          const y = Math.floor(randomIdx / cover.width);
+          const x = randomIdx % cover.width;
           coverCtx.clearRect(x, y, 1, 1);
         }
       }
 
       // Scanner Pattern
       const scanDurationMs = 2500;
-      const scanEndHoldMs = 250;
+      const scanEndHoldMs = 350;
 
       let horizontal = true;
       let lastScanLoop = Date.now();
@@ -136,36 +203,36 @@
 
       function scanner(reset) {
         if (reset) {
-          lastScanLoop = Date.now();
           curScanPixel = 0;
-
           resetForTransform();
+
+          lastScanLoop = Date.now();
           return;
         }
 
         const now = Date.now();
         if (now - lastScanLoop > scanDurationMs + scanEndHoldMs) {
           horizontal = !horizontal;
-          lastScanLoop = Date.now();
           curScanPixel = 0;
 
           randomizeColors();
           resetForTransform();
 
+          lastScanLoop = Date.now();
           return;
         }
 
-        const ratio = (now - lastScanLoop) / scanDurationMs;
+        const ratio = easing((now - lastScanLoop) / scanDurationMs);
         const newPixel = Math.min(Math.round(ratio * pixelCnt), pixelCnt);
 
         for (; curScanPixel < newPixel; curScanPixel++) {
           const y = horizontal
-            ? Math.floor(curScanPixel / main.width)
-            : curScanPixel % main.height;
+            ? Math.floor(curScanPixel / cover.width)
+            : curScanPixel % cover.height;
 
           const x = horizontal
-            ? curScanPixel % main.width
-            : Math.floor(curScanPixel / main.height);
+            ? curScanPixel % cover.width
+            : Math.floor(curScanPixel / cover.height);
 
           coverCtx.clearRect(x, y, 1, 1);
         }
@@ -177,16 +244,16 @@
       function simple(reset) {
         const colorChangeMs = 1000;
         if (reset) {
-          lastSimpleLoop = Date.now();
           coverCtx.clearRect(0, 0, cover.width, cover.height);
           drawMessage(mainCtx);
+          lastSimpleLoop = Date.now();
           return;
         }
 
         if (Date.now() - lastSimpleLoop > colorChangeMs) {
-          lastSimpleLoop = Date.now();
           randomizeColors();
           drawMessage(mainCtx);
+          lastSimpleLoop = Date.now();
         }
       }
 
@@ -201,7 +268,7 @@
         const midY = ctx.canvas.height / 2;
 
         const fontSize = Math.min(
-          Math.round(ctx.canvas.width / maxWidth),
+          Math.round(ctx.canvas.width / (maxWidth * 1.05)),
           Math.round(ctx.canvas.height / 2.7)
         );
 
@@ -210,9 +277,9 @@
         ctx.font = `${fontSize}px Roboto`;
         ctx.textBaseline = 'middle';
 
-        ctx.fillText('HAPPY', midX, midY - fontSize / 1.15);
-        ctx.fillText('BIRTHDAY', midX, midY);
-        ctx.fillText(`${nameTxt}!`, midX, midY + fontSize / 1.15);
+        ctx.fillText('HAPPY', midX, midY * 1.05 - fontSize / 1.15);
+        ctx.fillText('BIRTHDAY', midX, midY * 1.05);
+        ctx.fillText(`${nameTxt}!`, midX, midY * 1.05 + fontSize / 1.15);
       }
 
       function resetForTransform() {
@@ -223,28 +290,28 @@
 
       function resize() {
         let resized = false;
-        if (main.height !== main.clientHeight) {
+        if (main.height !== window.innerHeight) {
           resized = true;
-          main.height = main.clientHeight;
+          main.height = window.innerHeight;
         }
 
-        if (main.width !== main.clientWidth) {
+        if (main.width !== window.innerWidth) {
           resized = true;
-          main.width = main.clientWidth;
+          main.width = window.innerWidth;
         }
 
-        if (cover.height !== main.clientHeight) {
+        if (cover.height !== window.innerHeight) {
           resized = true;
-          cover.height = main.clientHeight;
+          cover.height = window.innerHeight;
         }
 
-        if (cover.width !== main.clientWidth) {
+        if (cover.width !== window.innerWidth) {
           resized = true;
-          cover.width = main.clientWidth;
+          cover.width = window.innerWidth;
         }
 
         if (resized) {
-          pixelCnt = main.width * main.height;
+          pixelCnt = window.innerHeight * window.innerWidth;
         }
 
         return resized;
