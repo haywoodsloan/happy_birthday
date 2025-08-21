@@ -68,7 +68,7 @@
       let pixelCnt = 0;
 
       let patternIdx = 0;
-      const patterns = [simple, scanner, dissolve, lines];
+      const patterns = [simple, scanner, dissolve, lines, spiral];
 
       cover.addEventListener('click', () => {
         patternIdx = (patternIdx + 1) % patterns.length;
@@ -85,6 +85,190 @@
       function render() {
         const resized = resize();
         patterns[patternIdx](resized);
+      }
+
+      // Spiral Pattern
+      const spiralDurationMs = 3000;
+      const spiralStartHoldMs = 350;
+      const spiralEndHoldMs = 350;
+      const spiralMaxDim = 20;
+
+      let lastSpiralLoop = Date.now();
+      let curSpiralCords = [0, 0];
+      let curSpiralBlock = 0;
+
+      let spiralXBounds = [0, 0];
+      let spiralYBounds = [0, 0];
+
+      let spiralDirection = '';
+      let spiralBlockCnt = 0;
+      let spiralBlockSize = 0;
+
+      function spiral(reset) {
+        if (reset) {
+          curSpiralCords = [0, 0];
+          curSpiralBlock = 0;
+
+          spiralDirection = 'right';
+          spiralXBounds = [0, cover.width];
+          spiralYBounds = [0, cover.height];
+
+          spiralBlockSize = Math.floor(
+            Math.max(cover.width / spiralMaxDim, cover.height / spiralMaxDim)
+          );
+
+          spiralBlockCnt =
+            Math.floor(cover.width / spiralBlockSize) *
+            Math.floor(cover.height / spiralBlockSize);
+
+          resetForTransform();
+          lastSpiralLoop = Date.now();
+
+          return;
+        }
+
+        const now = Date.now();
+        if (
+          now - lastSpiralLoop >
+          spiralDurationMs + spiralEndHoldMs + spiralStartHoldMs
+        ) {
+          curSpiralCords = [0, 0];
+          curSpiralBlock = 0;
+
+          spiralDirection = 'right';
+          spiralXBounds = [0, cover.width];
+          spiralYBounds = [0, cover.height];
+
+          randomizeColors();
+          resetForTransform();
+
+          lastSpiralLoop = Date.now();
+          return;
+        }
+
+        const ratio = easing(
+          Math.max(now - lastSpiralLoop - spiralStartHoldMs, 0) /
+            spiralDurationMs
+        );
+
+        const newBlock = Math.min(
+          Math.round(ratio * spiralBlockCnt),
+          spiralBlockCnt
+        );
+
+        for (; curSpiralBlock < newBlock; curSpiralBlock++) {
+          switch (spiralDirection) {
+            case 'right':
+              if (curSpiralCords[0] + spiralBlockSize <= spiralXBounds[1]) {
+                coverCtx.clearRect(
+                  curSpiralCords[0],
+                  curSpiralCords[1],
+                  spiralBlockSize,
+                  spiralBlockSize
+                );
+                curSpiralCords[0] += spiralBlockSize;
+
+                // Catch any extras to the right
+                if (cover.width - curSpiralCords[0] < spiralBlockSize) {
+                  coverCtx.clearRect(
+                    curSpiralCords[0],
+                    curSpiralCords[1],
+                    spiralBlockSize,
+                    spiralBlockSize
+                  );
+                }
+
+                break;
+              } else {
+                spiralDirection = 'down';
+                spiralYBounds[0] += spiralBlockSize;
+                curSpiralCords[1] += spiralBlockSize;
+                curSpiralCords[0] -= spiralBlockSize;
+              }
+            case 'down':
+              if (curSpiralCords[1] + spiralBlockSize <= spiralYBounds[1]) {
+                coverCtx.clearRect(
+                  curSpiralCords[0],
+                  curSpiralCords[1],
+                  spiralBlockSize,
+                  spiralBlockSize
+                );
+
+                // Catch any extras to the right
+                if (cover.width - (curSpiralCords[0] + spiralBlockSize) > 0) {
+                  coverCtx.clearRect(
+                    curSpiralCords[0] + spiralBlockSize,
+                    curSpiralCords[1],
+                    spiralBlockSize,
+                    spiralBlockSize
+                  );
+                }
+
+                curSpiralCords[1] += spiralBlockSize;
+
+                // Catch any extras to the bottom-right
+                if (cover.height - curSpiralCords[1] < spiralBlockSize) {
+                  coverCtx.clearRect(
+                    curSpiralCords[0],
+                    curSpiralCords[1],
+                    spiralBlockSize * 2,
+                    spiralBlockSize * 2
+                  );
+                }
+
+                break;
+              } else {
+                spiralDirection = 'left';
+                spiralXBounds[1] -= spiralBlockSize;
+                curSpiralCords[0] -= spiralBlockSize;
+                curSpiralCords[1] -= spiralBlockSize;
+              }
+            case 'left':
+              if (curSpiralCords[0] >= spiralXBounds[0]) {
+                coverCtx.clearRect(
+                  curSpiralCords[0],
+                  curSpiralCords[1],
+                  spiralBlockSize,
+                  spiralBlockSize
+                );
+
+                // Catch any extras to the bottom
+                if (cover.height - (curSpiralCords[1] + spiralBlockSize) > 0) {
+                  coverCtx.clearRect(
+                    curSpiralCords[0],
+                    curSpiralCords[1] + spiralBlockSize,
+                    spiralBlockSize,
+                    spiralBlockSize
+                  );
+                }
+
+                curSpiralCords[0] -= spiralBlockSize;
+                break;
+              } else {
+                spiralDirection = 'up';
+                spiralYBounds[1] -= spiralBlockSize;
+                curSpiralCords[1] -= spiralBlockSize;
+                curSpiralCords[0] += spiralBlockSize;
+              }
+            case 'up':
+              if (curSpiralCords[1] >= spiralYBounds[0]) {
+                coverCtx.clearRect(
+                  curSpiralCords[0],
+                  curSpiralCords[1],
+                  spiralBlockSize,
+                  spiralBlockSize
+                );
+                curSpiralCords[1] -= spiralBlockSize;
+                break;
+              } else {
+                spiralDirection = 'right';
+                curSpiralBlock--;
+                spiralXBounds[0] += spiralBlockSize;
+                curSpiralCords[0] += spiralBlockSize;
+                curSpiralCords[1] += spiralBlockSize;
+              }
+          }
+        }
       }
 
       // Lines Pattern
