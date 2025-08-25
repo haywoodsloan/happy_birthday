@@ -47,11 +47,16 @@
 
       const urlParams = new URLSearchParams(window.location.search);
       const nameTxt = urlParams.get('name')?.toUpperCase() ?? 'FRIEND';
-
       const [main, cover] = document.getElementsByTagName('canvas');
-      const coverCtx = cover.getContext('2d', { willReadFrequently: true });
+
+      const coverCtx = cover.getContext('2d', {
+        willReadFrequently: true,
+        colorSpace: 'display-p3',
+      });
+
       const mainCtx = main.getContext('2d', {
         willReadFrequently: true,
+        colorSpace: 'display-p3',
         alpha: false,
       });
 
@@ -113,7 +118,7 @@
           spiralXBounds = [0, cover.width];
           spiralYBounds = [0, cover.height];
 
-          spiralBlockSize = Math.round(
+          spiralBlockSize = Math.floor(
             Math.max(cover.width / spiralMaxDim, cover.height / spiralMaxDim)
           );
 
@@ -257,7 +262,7 @@
                   spiralBlockSize,
                   spiralBlockSize
                 );
-                
+
                 curSpiralCords[1] -= spiralBlockSize;
                 break;
               } else {
